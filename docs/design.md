@@ -39,7 +39,7 @@ Not confirmed, so S1 checks them: theme fallback when a site uses a custom theme
 | Retrieve: `.../Capture/Interactive/Retrieve/v1.30/json6.ws`, params `Key`, `Id`. Items include `Company`, `Line1-5`, `City`, `Province`, `PostalCode`, `CountryIso2`, `CountryName`, `Label`. **Uses credit** | [retrieve.md](https://docs.loqate.com/api-reference/address-capture/retrieve.md) |
 | Errors are a row of `Error`, `Description`, `Cause`, `Resolution`. Generic codes are under 100, endpoint-specific ones 1000+. Codes: 2 unknown key, 3 out of credit, 4 IP not allowed, 5 URL not allowed, 8 key daily limit, 10 surge protector, 14 too many Finds without Retrieves, 16 key expired, 17 per-user limit, -1 unknown | [common-errors.md](https://docs.loqate.com/api-reference/common-errors.md) |
 | Each key has URL and IP restrictions and a daily lookup limit | [create-an-api-key.md](https://docs.loqate.com/loqate-basics/create-an-api-key.md) |
-| Capture JS v4: `https://api.addressy.com/js/address-4.05.js` + `.css`, `new pca.Address(fields, { key })`. The key is visible in the page; the URL restriction protects it | [sdk.md](https://docs.loqate.com/our-services/address-capture/sdk.md) |
+| Capture JS v4: `https://api.addressy.com/js/address-4.05.js` + `https://api.addressy.com/css/address-4.05.css`, `new pca.Address(fields, { key })`. The key is visible in the page; the URL restriction protects it | [sdk.md](https://docs.loqate.com/our-services/address-capture/sdk.md) |
 | JSON shape of an error item inside `Items` | [unverified] |
 
 **Ideal Postcodes** (OpenAPI 4.12.0 and the guides):

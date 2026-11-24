@@ -9,6 +9,8 @@ test.skip(process.env.E2E_MODE !== 'capture' || !serverKey || !captureKey, 'Set 
 
 test('capture mode loads v4 script without ApiKey', async ({ page }) => {
   const script = page.waitForRequest('https://api.addressy.com/js/address-4.05.js');
+  // Loqate serves the stylesheet from /css/, not /js/ (a /js/ URL is a 404 and leaves the widget unstyled).
+  const stylesheet = page.waitForRequest('https://api.addressy.com/css/address-4.05.css');
   await page.route('https://api.addressy.com/**', (route) =>
     route.fulfill({
       status: 200,
@@ -20,6 +22,7 @@ test('capture mode loads v4 script without ApiKey', async ({ page }) => {
 
   await page.goto('/address-demo-single');
   await script;
+  await stylesheet;
 
   const root = page.locator('[data-address-lookup]:visible');
   await expect(root).toHaveAttribute('data-mode', 'capture');

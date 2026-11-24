@@ -396,14 +396,14 @@ let captureLoad;
 // One script and one stylesheet per page, however many address fields it holds: a second copy would redefine window.pca.
 function loadCapture(version) {
   captureLoad ??= new Promise((resolve) => {
-    const base = `https://api.addressy.com/js/address-${version}`;
+    // The script and the stylesheet live under different paths: /js/ for the script, /css/ for the stylesheet.
     const css = document.createElement('link');
     css.rel = 'stylesheet';
-    css.href = `${base}.css`;
+    css.href = `https://api.addressy.com/css/address-${version}.css`;
     document.head.append(css);
 
     const script = document.createElement('script');
-    script.src = `${base}.js`;
+    script.src = `https://api.addressy.com/js/address-${version}.js`;
     script.async = true;
     script.addEventListener('load', () => resolve(window.pca));
     script.addEventListener('error', () => resolve(undefined));
