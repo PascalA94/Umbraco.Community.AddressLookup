@@ -1,0 +1,28 @@
+{
+  "$schema": "https://marketplace.umbraco.com/umbraco-marketplace-schema.json",
+  "Title": "Address Lookup",
+  "Description": "An Umbraco Forms address lookup field with Loqate and Ideal Postcodes behind a server-side proxy.",
+  "Category": "Editor Tools",
+  "PackageType": "Package",
+  "LicenseTypes": [
+    "Free"
+  ],
+  "DocumentationUrl": "https://github.com/PascalA94/Umbraco.Community.AddressLookup#readme",
+  "IssueTrackerUrl": "https://github.com/PascalA94/Umbraco.Community.AddressLookup/issues",
+  "LookingForContributors": true,
+  "AuthorDetails": {
+    "Name": "Pascal Meyer",
+    "Url": "https://github.com/PascalA94",
+    "ImageUrl": "https://github.com/PascalA94.png"
+  },
+  "Screenshots": [],
+  "Tags": [
+    "umbraco",
+    "umbraco-marketplace",
+    "umbraco-forms",
+    "address-lookup",
+    "postcode",
+    "loqate",
+    "ideal-postcodes"
+  ]
+}

@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="Umbraco.Community.AddressLookup/Umbraco.Community.AddressLookup.csproj" />
+  <Project Path="Umbraco.Community.AddressLookup.Tests/Umbraco.Community.AddressLookup.Tests.csproj" />
+  <Project Path="Umbraco.Community.AddressLookup.IntegrationTests/Umbraco.Community.AddressLookup.IntegrationTests.csproj" />
+  <Project Path="../demo/Umbraco.Community.AddressLookup.DemoSite/Umbraco.Community.AddressLookup.DemoSite.csproj" />
+</Solution>

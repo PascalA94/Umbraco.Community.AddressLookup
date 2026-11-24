@@ -1,0 +1,12 @@
+{
+  "name": "Umbraco.Community.AddressLookup",
+  "allowTelemetry": false,
+  "extensions": [
+    {
+      "type": "formsFieldPreview",
+      "alias": "Community.AddressLookup.Preview",
+      "name": "Address lookup field preview",
+      "element": "/App_Plugins/AddressLookup/backoffice/preview.js"
+    }
+  ]
+}

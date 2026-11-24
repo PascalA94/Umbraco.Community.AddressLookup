@@ -1,0 +1,151 @@
+@using System.Globalization
+@using Microsoft.AspNetCore.Antiforgery
+@using Microsoft.Extensions.Hosting
+@using Umbraco.Cms.Core.Security
+@using Umbraco.Community.AddressLookup.FieldTypes
+@model Umbraco.Forms.Web.Models.FieldViewModel
+@inject AddressFieldRenderer Renderer
+@inject IAntiforgery Antiforgery
+@inject IHostEnvironment Environment
+@inject IBackOfficeSecurityAccessor BackOfficeSecurity
+@*
+    The manual panel is rendered open and collapsed by the script, never the other way round: if the script is blocked or fails,
+    the visitor still has the inputs. The noscript stylesheet only hides the search box, which cannot work without it.
+
+    The address lookup field (design 3.2, 6). The view only prints what AddressFieldRenderer decided and holds no write service
+    (pitfall P5). Without JavaScript the manual inputs are the whole field. The search box is the control the Forms caption
+    labels, so it carries the field's html id.
+*@
+@{
+    // Setup problems are for the people building the site, never for an anonymous visitor.
+    var diagnostics = Environment.IsDevelopment() || BackOfficeSecurity.BackOfficeSecurity?.CurrentUser is not null;
+    var render = Renderer.Create(new AddressFieldRenderRequest(
+        Model.FormId, Model.Name, Model.Id, Model.Caption, Model.Mandatory, Model.AdditionalSettings,
+        Context.Request.HasFormContentType ? Context.Request.Form : null, diagnostics,
+        Model.Values?.FirstOrDefault()?.ToString()));
+
+    var id = render.HtmlId;
+    var name = render.Name;
+    var posted = render.Posted;
+    var lookup = render.LookupEnabled;
+    var capture = render.CaptureEnabled;
+    var mode = lookup ? "proxy" : capture ? "capture" : "manual";
+    var collapsed = lookup && !render.ShowManual;
+    var endpoint = Context.Request.PathBase + "/umbraco/surface/AddressLookup";
+    var token = lookup ? Antiforgery.GetAndStoreTokens(Context).RequestToken : null;
+    var placeholder = string.IsNullOrWhiteSpace(render.Placeholder) ? null : render.Placeholder;
+    var country = string.IsNullOrEmpty(posted.Country) ? render.Countries[0] : posted.Country;
+
+    // Each page needs the script and styles once, however many address fields it holds.
+    const string assetsKey = "community.addressLookup.assets";
+    var needsAssets = !Context.Items.ContainsKey(assetsKey);
+    Context.Items[assetsKey] = true;
+
+    string CountryName(string iso2)
+    {
+        try { return new RegionInfo(iso2).EnglishName; }
+        catch (ArgumentException) { return iso2; }
+    }
+}
+@if (needsAssets)
+{
+    <link rel="stylesheet" href="@Url.Content("~/App_Plugins/AddressLookup/address-lookup.css")" />
+    <noscript><link rel="stylesheet" href="@Url.Content("~/App_Plugins/AddressLookup/address-lookup-nojs.css")" /></noscript>
+    <script type="module" src="@Url.Content("~/App_Plugins/AddressLookup/address-lookup.js")"></script>
+}
+<div class="al"
+     data-address-lookup
+     data-mode="@mode"
+     data-endpoint="@endpoint"
+     data-ticket="@render.Ticket"
+     data-token="@token"
+     data-capture-key="@render.CaptureKey"
+     data-capture-version="@render.CaptureScriptVersion"
+     data-countries="@string.Join(",", render.Countries)"
+     data-id="@id">
+    @if (lookup)
+    {
+        <div class="al__search" data-al-search>
+            <input type="text" id="@id" class="al__input" role="combobox" autocomplete="off" spellcheck="false" maxlength="100"
+                   aria-expanded="false" aria-controls="@(id)_list" aria-autocomplete="list" aria-describedby="@(id)_hint"
+                   placeholder="@placeholder" aria-required="@(render.Mandatory ? "true" : null)" data-al-input />
+            <p id="@(id)_hint" class="al__hint">Start typing a postcode or address, then choose it from the list.</p>
+            <ul id="@(id)_list" class="al__list" role="listbox" aria-label="Address suggestions" hidden data-al-list></ul>
+            <div class="al__sr" role="status" aria-live="polite" aria-atomic="true" data-al-status></div>
+            <p class="al__message" role="status" hidden data-al-message></p>
+            @if (render.AllowManualEntry)
+            {
+                <button type="button" class="al__button" aria-controls="@(id)_manual" aria-expanded="@(collapsed ? "false" : "true")" data-al-manual-button>Enter address manually</button>
+            }
+        </div>
+    }
+    else if (capture)
+    {
+        <div class="al__search" data-al-search>
+            <input type="text" id="@id" class="al__input" autocomplete="off" spellcheck="false"
+                   placeholder="@placeholder" aria-describedby="@(id)_hint" data-al-input />
+            <p id="@(id)_hint" class="al__hint">Start typing a postcode or address, or fill in the boxes below.</p>
+        </div>
+    }
+
+    <div id="@(id)_manual" class="al__manual" role="group" aria-label="@render.Caption" data-al-manual data-collapsed="@(collapsed ? "true" : null)">
+        <div class="al__field">
+            <label for="@(id)_line1">Address line 1</label>
+            <input type="text" id="@(id)_line1" name="@(name).line1" value="@posted.Line1" maxlength="100"
+                   autocomplete="address-line1" aria-required="@(render.Mandatory ? "true" : null)" data-al-part="line1" />
+        </div>
+        <div class="al__field">
+            <label for="@(id)_line2">Address line 2 (optional)</label>
+            <input type="text" id="@(id)_line2" name="@(name).line2" value="@posted.Line2" maxlength="100"
+                   autocomplete="address-line2" data-al-part="line2" />
+        </div>
+        <div class="al__field">
+            <label for="@(id)_line3">Address line 3 (optional)</label>
+            <input type="text" id="@(id)_line3" name="@(name).line3" value="@posted.Line3" maxlength="100"
+                   autocomplete="address-line3" data-al-part="line3" />
+        </div>
+        <div class="al__field">
+            <label for="@(id)_town">Town or city</label>
+            <input type="text" id="@(id)_town" name="@(name).town" value="@posted.Town" maxlength="60"
+                   autocomplete="address-level2" aria-required="@(render.Mandatory ? "true" : null)" data-al-part="town" />
+        </div>
+        <div class="al__field">
+            <label for="@(id)_county">County (optional)</label>
+            <input type="text" id="@(id)_county" name="@(name).county" value="@posted.County" maxlength="60" autocomplete="address-level1" data-al-part="county" />
+        </div>
+        <div class="al__field al__field--short">
+            <label for="@(id)_postcode">Postcode</label>
+            <input type="text" id="@(id)_postcode" name="@(name).postcode" value="@posted.Postcode" maxlength="10"
+                   autocomplete="postal-code" aria-required="@(render.Mandatory ? "true" : null)" data-al-part="postcode" />
+        </div>
+        @if (render.ShowCountry && render.Countries.Count > 1)
+        {
+            <div class="al__field">
+                <label for="@(id)_country">Country</label>
+                <select id="@(id)_country" name="@(name).country" autocomplete="country" data-al-part="country">
+                    @foreach (var iso2 in render.Countries)
+                    {
+                        <option value="@iso2" selected="@(iso2 == country ? "selected" : null)">@CountryName(iso2)</option>
+                    }
+                </select>
+            </div>
+        }
+        else
+        {
+            @* Always posted: a picked address from a second country only verifies if its own country comes back with it. *@
+            <input type="hidden" name="@(name).country" value="@country" data-al-part="country" />
+        }
+    </div>
+    <input type="hidden" name="@(name).providerId" value="@posted.ProviderId" data-al-part="providerId" />
+    <input type="hidden" name="@(name).proof" value="@posted.Proof" data-al-part="proof" />
+
+    @if (render.ConfigurationErrors.Count > 0)
+    {
+        <ul class="al__diagnostics" data-al-diagnostics>
+            @foreach (var error in render.ConfigurationErrors)
+            {
+                <li>@error</li>
+            }
+        </ul>
+    }
+</div>
