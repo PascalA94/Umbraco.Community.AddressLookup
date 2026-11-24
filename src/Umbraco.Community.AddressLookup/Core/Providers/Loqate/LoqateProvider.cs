@@ -79,7 +79,8 @@ public sealed class LoqateProvider(
         }
 
         ThrowIfError(first);
-        var lines = new[] { "Company", "Line1", "Line2", "Line3" }
+        // v1.30 returns up to five lines; FitToField folds anything past the field's three into line 3.
+        var lines = new[] { "Company", "Line1", "Line2", "Line3", "Line4", "Line5" }
             .Select(n => Str(first, n)).Where(l => !string.IsNullOrWhiteSpace(l)).Select(l => l!).ToList();
 
         return new AddressValue(

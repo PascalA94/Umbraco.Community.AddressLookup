@@ -245,13 +245,45 @@ public class AddressFieldRendererTests
         var picked = new Umbraco.Community.AddressLookup.Model.AddressValue(
             ["Flat 2", "10 High Street"], "Leeds", null, "LS1 4AP", "GB", "United Kingdom", "stub", "stub-a2", "lookup");
 
-        var render = Render(stored: picked.ToJson());
+        // The submit path tags a lookup it verified; that tag is what earns the stored value a fresh proof.
+        var render = Render(stored: picked.ToJson(_proofs.IssueStoredTag(picked.Normalise(), _fieldId)));
 
         Assert.True(render.ShowManual);
         Assert.Equal("Flat 2", render.Posted.Line1);
         Assert.Equal("10 High Street", render.Posted.Line2);
         Assert.Equal("stub-a2", render.Posted.ProviderId);
         Assert.True(_proofs.Verify(render.Posted.Proof, picked.Normalise(), _fieldId));
+    }
+
+    [Fact]
+    public void Stored_ClaimingLookup_WithoutTheServersTag_GetsNoProof()
+    {
+        // Prefill content (raw form state, member prefill, a FormPrePopulate handler) is not something the server issued, so
+        // rendering it must not turn it into a signed proof.
+        var forged = new Umbraco.Community.AddressLookup.Model.AddressValue(
+            ["Anywhere"], "Leeds", null, "LS1 4AP", "GB", null, "stub", "forged-id", "lookup");
+
+        var render = Render(stored: forged.ToJson());
+
+        Assert.Equal("Anywhere", render.Posted.Line1);
+        Assert.Equal(string.Empty, render.Posted.Proof);
+        Assert.Equal(string.Empty, render.Posted.ProviderId);
+    }
+
+    [Fact]
+    public void OnlyCountryPosted_ByAnotherFieldsFailedSubmit_CountsAsNothingPosted()
+    {
+        // The view always posts {field}.country (and the hidden provider inputs), so a failed submit caused by another field
+        // must not open the manual panel or block the stored-value refill.
+        var form = Posted(new() { ["country"] = "GB", ["providerId"] = string.Empty, ["proof"] = string.Empty });
+
+        Assert.False(Render(form: form).ShowManual);
+
+        var manual = new Umbraco.Community.AddressLookup.Model.AddressValue(
+            ["1 High Street"], "Leeds", null, "LS1 4AP", "GB", null, null, null, "manual");
+        var refilled = Render(form: form, stored: manual.ToJson());
+        Assert.Equal("1 High Street", refilled.Posted.Line1);
+        Assert.True(refilled.ShowManual);
     }
 
     [Fact]

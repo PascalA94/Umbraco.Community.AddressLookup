@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Runs all third-party build and test code (npm, vite, vitest, NuGet) with read-only permissions, so none of it can
+  # Runs all third-party build and test code (NuGet restore, build and test) with read-only permissions, so none of it can
   # request the OIDC token that publishes.
   build:
     runs-on: ubuntu-latest
@@ -54,7 +54,7 @@ jobs:
           done < eng/lines.txt
 
       # One nupkg per line (17.x and 18.x), each carrying wwwroot. Only the package is packed: tests and the demo site
-      # are IsPackable=false. pack.sh stamps the line's version into the manifest and restores it afterwards.
+      # are IsPackable=false. pack.sh packs one nupkg per line.
       - name: Pack
         run: bash build/pack.sh ./artifacts
 

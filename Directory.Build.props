@@ -35,10 +35,10 @@
 
   <PropertyGroup>
     <!-- 17.x and 18.x ship from one tag release/<PackageMinor>.<PackagePatch>[-suffix]; the major comes from the line.
-         An empty suffix is a stable release (17.0.0 and 18.0.0); set it to alpha.1 for a prerelease. -->
+         An empty suffix is a stable release (17.0.0 and 18.0.0); set it to alpha.1 for a prerelease. The first release is a prerelease until the real-provider checks (Task 14) pass. -->
     <PackageMinor>0</PackageMinor>
     <PackagePatch>0</PackagePatch>
-    <PackageVersionSuffix></PackageVersionSuffix>
+    <PackageVersionSuffix>alpha.1</PackageVersionSuffix>
     <UmbracoRange>[$(UmbracoFloor), $(UmbracoNextMajor))</UmbracoRange>
     <!-- Forms floors (17.6.2 / 18.2.2) cover the 27 Oct 2026 round; Forms majors track the CMS major. -->
     <FormsRange>[$(FormsFloor), $(UmbracoNextMajor))</FormsRange>

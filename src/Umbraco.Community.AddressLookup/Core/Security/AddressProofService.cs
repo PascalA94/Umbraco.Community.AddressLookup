@@ -16,6 +16,9 @@ public sealed class AddressProofService(IDataProtectionProvider protection, Time
 
     private readonly IDataProtector _protector = protection.CreateProtector("community.addressLookup.proof.v1");
 
+    // A separate purpose, so a proof (which the browser holds) can never be presented as a stored-value tag or the reverse.
+    private readonly IDataProtector _tagProtector = protection.CreateProtector("community.addressLookup.storedTag.v1");
+
     public string Issue(AddressValue address, Guid fieldId) =>
         _protector.Protect(
             $"{fieldId:N}|{time.GetUtcNow().ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture)}|{Canonical(address)}");
@@ -54,6 +57,37 @@ public sealed class AddressProofService(IDataProtectionProvider protection, Time
             return false;
         }
     }
+
+    /// <summary>
+    /// A keyed tag stored inside a lookup value, saying this server accepted it as a verified lookup. It is how a stored value
+    /// proves it was made by the submit path and not typed into a prefill, a form state or a headless post. It binds the
+    /// field and a digest of the address (so the address itself is not repeated), and has no expiry: a multi-page form or a
+    /// later re-render must still trust it. That makes it as replayable as the proof, and a data-quality control in the same way.
+    /// </summary>
+    public string IssueStoredTag(AddressValue address, Guid fieldId) =>
+        _tagProtector.Protect($"{fieldId:N}|{Digest(address)}");
+
+    public bool VerifyStoredTag(string? tag, AddressValue stored, Guid fieldId)
+    {
+        if (string.IsNullOrEmpty(tag) || tag.Length > MaxLength || stored.Source != "lookup" || string.IsNullOrEmpty(stored.ProviderId))
+        {
+            return false;
+        }
+
+        try
+        {
+            return CryptographicOperations.FixedTimeEquals(
+                System.Text.Encoding.UTF8.GetBytes(_tagProtector.Unprotect(tag)),
+                System.Text.Encoding.UTF8.GetBytes($"{fieldId:N}|{Digest(stored)}"));
+        }
+        catch (Exception ex) when (ex is CryptographicException or FormatException or ArgumentException)
+        {
+            return false;
+        }
+    }
+
+    private static string Digest(AddressValue address) =>
+        Convert.ToBase64String(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(Canonical(address))));
 
     // The country name, the provider alias and the source are display or bookkeeping fields: the browser posts the
     // address parts and the provider id, and those are what a visitor could change.
