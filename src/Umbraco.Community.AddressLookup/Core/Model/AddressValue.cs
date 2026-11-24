@@ -47,14 +47,24 @@ public sealed record AddressValue(
         return true;
     }
 
-    public string ToJson() => JsonSerializer.Serialize(
-        new Wire(Version, [.. Lines], Town, County, Postcode, CountryIso2, Country, Provider, ProviderId, Source),
+    public string ToJson() => ToJson(null);
+
+    /// <summary>
+    /// The stored JSON with an optional keyed tag (key <c>t</c>) saying the server itself issued this lookup. Readers that do
+    /// not know the key ignore it, so the schema version stays 1; a value without a valid tag is untrusted.
+    /// </summary>
+    public string ToJson(string? tag) => JsonSerializer.Serialize(
+        new Wire(Version, [.. Lines], Town, County, Postcode, CountryIso2, Country, Provider, ProviderId, Source, tag),
         Context.Wire);
 
     /// <summary>Parses stored JSON. Never throws: malformed, oversize or unknown-version input returns false.</summary>
-    public static bool TryParse(string? json, out AddressValue? value)
+    public static bool TryParse(string? json, out AddressValue? value) => TryParse(json, out value, out _);
+
+    /// <summary>As <see cref="TryParse(string?, out AddressValue?)"/>, also returning the keyed tag, or null when there is none.</summary>
+    public static bool TryParse(string? json, out AddressValue? value, out string? tag)
     {
         value = null;
+        tag = null;
         if (string.IsNullOrWhiteSpace(json) || json.Length > MaxJsonLength)
         {
             return false;
@@ -70,6 +80,7 @@ public sealed record AddressValue(
 
             value = new AddressValue(
                 wire.Lines, wire.Town, wire.County, wire.Postcode, wire.CountryIso2, wire.Country, wire.Provider, wire.ProviderId, wire.Source);
+            tag = wire.T;
             return true;
         }
         catch (JsonException)
@@ -159,7 +170,8 @@ public sealed record AddressValue(
         [property: JsonPropertyName("country"), JsonPropertyOrder(6)] string? Country,
         [property: JsonPropertyName("provider"), JsonPropertyOrder(7)] string? Provider,
         [property: JsonPropertyName("providerId"), JsonPropertyOrder(8)] string? ProviderId,
-        [property: JsonPropertyName("source"), JsonPropertyOrder(9)] string? Source)
+        [property: JsonPropertyName("source"), JsonPropertyOrder(9)] string? Source,
+        [property: JsonPropertyName("t"), JsonPropertyOrder(10), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? T = null)
     {
         // Same rule as the public record: the compiler's ToString would print every address part.
         private bool PrintMembers(System.Text.StringBuilder builder)

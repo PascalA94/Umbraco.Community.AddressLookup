@@ -76,7 +76,7 @@ public sealed class DemoPageSeeder(
                 await contentTypes.CreateAsync(type, Cms.Core.Constants.Security.SuperUserKey);
             }
 
-            foreach (var name in new[] { "address-demo-single", "address-demo-two-pages", "address-demo-conditional" })
+            foreach (var name in new[] { "address-demo-single", "address-demo-two-pages", "address-demo-conditional", "address-demo-required" })
             {
                 var page = content.Create(name, Cms.Core.Constants.System.Root, Alias);
                 content.Save(page);

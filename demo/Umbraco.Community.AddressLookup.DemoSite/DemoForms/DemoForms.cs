@@ -16,6 +16,7 @@ public static class DemoFormIds
     public static readonly Guid Single = new("0a1b2c3d-0001-4000-8000-000000000001");
     public static readonly Guid TwoPages = new("0a1b2c3d-0002-4000-8000-000000000002");
     public static readonly Guid Conditional = new("0a1b2c3d-0003-4000-8000-000000000003");
+    public static readonly Guid Required = new("0a1b2c3d-0004-4000-8000-000000000004");
 
     /// <summary>The page names double as their URL segments (<c>/address-demo-single</c> and so on).</summary>
     public static Guid? Find(string pageName) => pageName switch
@@ -23,6 +24,7 @@ public static class DemoFormIds
         "address-demo-single" => Single,
         "address-demo-two-pages" => TwoPages,
         "address-demo-conditional" => Conditional,
+        "address-demo-required" => Required,
         _ => null,
     };
 }
@@ -53,6 +55,8 @@ public sealed class DemoFormSeeder(IFormService forms, FieldCollection fields, I
                 [[Address(Guid.NewGuid(), mandatory: true)], [Text(Guid.NewGuid(), "Your name", "name", text.Id, mandatory: false)]],
                 text.Id);
 
+            Seed(DemoFormIds.Required, "Address demo, lookup required", [[Address(Guid.NewGuid(), mandatory: true, requireLookup: true)]], text.Id);
+
             var delivery = Guid.NewGuid();
             var conditional = Address(Guid.NewGuid(), mandatory: true);
             conditional.Condition = new FieldCondition
@@ -82,7 +86,7 @@ public sealed class DemoFormSeeder(IFormService forms, FieldCollection fields, I
         return Task.CompletedTask;
     }
 
-    private static Field Address(Guid id, bool mandatory) => new()
+    private static Field Address(Guid id, bool mandatory, bool requireLookup = false) => new()
     {
         Id = id,
         Caption = "Home address",
@@ -94,7 +98,7 @@ public sealed class DemoFormSeeder(IFormService forms, FieldCollection fields, I
             ["Countries"] = "GB",
             ["Placeholder"] = "Postcode or address",
             ["AllowManualEntry"] = "true",
-            ["RequireLookup"] = "false",
+            ["RequireLookup"] = requireLookup ? "true" : "false",
             ["ShowCountry"] = "false",
         },
     };

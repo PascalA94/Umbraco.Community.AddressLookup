@@ -28,6 +28,8 @@
     var name = render.Name;
     var posted = render.Posted;
     var lookup = render.LookupEnabled;
+    // Read from the field's own settings: the render model does not carry it. Only the proxy can honour it (Capture is refused by configuration checks).
+    var requireLookup = lookup && AddressFieldSettings.IsOn(AddressFieldSettings.Get(Model.AdditionalSettings, "RequireLookup"));
     var capture = render.CaptureEnabled;
     var mode = lookup ? "proxy" : capture ? "capture" : "manual";
     var collapsed = lookup && !render.ShowManual;
@@ -62,18 +64,20 @@
      data-capture-key="@render.CaptureKey"
      data-capture-version="@render.CaptureScriptVersion"
      data-countries="@string.Join(",", render.Countries)"
+     data-require-lookup="@(requireLookup ? "true" : null)"
      data-id="@id">
     @if (lookup)
     {
         <div class="al__search" data-al-search>
             <input type="text" id="@id" class="al__input" role="combobox" autocomplete="off" spellcheck="false" maxlength="100"
                    aria-expanded="false" aria-controls="@(id)_list" aria-autocomplete="list" aria-describedby="@(id)_hint"
-                   placeholder="@placeholder" aria-required="@(render.Mandatory ? "true" : null)" data-al-input />
+                   placeholder="@placeholder" data-al-input />
             <p id="@(id)_hint" class="al__hint">Start typing a postcode or address, then choose it from the list.</p>
             <ul id="@(id)_list" class="al__list" role="listbox" aria-label="Address suggestions" hidden data-al-list></ul>
             <div class="al__sr" role="status" aria-live="polite" aria-atomic="true" data-al-status></div>
             <p class="al__message" role="status" hidden data-al-message></p>
-            @if (render.AllowManualEntry)
+            @* RequireLookup: the server only accepts a picked address, so a manual-entry route would be a dead end. *@
+            @if (render.AllowManualEntry && !requireLookup)
             {
                 <button type="button" class="al__button" aria-controls="@(id)_manual" aria-expanded="@(collapsed ? "false" : "true")" data-al-manual-button>Enter address manually</button>
             }

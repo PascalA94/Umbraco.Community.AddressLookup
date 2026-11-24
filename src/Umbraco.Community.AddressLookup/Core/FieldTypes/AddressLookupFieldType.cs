@@ -32,6 +32,7 @@ public sealed class AddressLookupFieldType : FieldType
     private const int MaxCounty = 60;
     private const int MaxPostcode = 10;
     private const int HardCeiling = 512;
+    private const int MaxFieldLines = 3;
 
     private readonly IOptionsMonitor<AddressLookupOptions> _options;
     private readonly AddressProofService _proofs;
@@ -82,72 +83,136 @@ public sealed class AddressLookupFieldType : FieldType
         Form form, Field field, IEnumerable<object> postedValues, HttpContext context,
         IPlaceholderParsingService placeholderParsingService, IFieldTypeStorage fieldTypeStorage)
     {
-        var (_, errors, _) = EvaluateWithState(field, context);
-
-        // Forms calls this for a field hidden by a condition too, and the base implementation is what skips it: it returns no
-        // error for a hidden mandatory field. Our override replaces it, so a hidden mandatory field would block the submit
-        // (also when the visitor typed an address and then hid the field again). For a mandatory field, the base answering
-        // "no error" with no values means "not shown". Verified for a field's own condition on 17.6.2 and 18.2.2 only;
-        // a condition on its fieldset or page is not covered (docs/spikes.md).
-        if (errors.Count > 0 && field.Mandatory && field.Condition is { Enabled: true }
-            && !base.ValidateField(form, field, [], context, placeholderParsingService, fieldTypeStorage).Any())
+        // Forms still calls this for a hidden field (it skips only a hidden fieldset on the web path, and nothing at all on the
+        // Delivery and Management APIs), and the base implementation is what normally answers "no error" for one. We replace
+        // it, so decide visibility ourselves. A field's own condition and its fieldset's are the only levels Forms has: a page
+        // has none (only its buttons do). Hidden means no error and nothing stored, mandatory or not, so a visitor who typed an
+        // address and then hid the field is not blocked by half an address they can no longer see.
+        if (IsHidden(form, field, fieldTypeStorage, placeholderParsingService))
         {
+            // ProcessSubmittedValue runs first on the form path and may already have accepted a value.
+            context.Items[OutcomeKey(field)] = new Outcome(null, [], true);
             return [];
         }
 
+        var (_, errors, _) = EvaluateWithState(field, context, postedValues);
         return errors;
     }
 
     public override IEnumerable<object> ProcessSubmittedValue(Field field, IEnumerable<object> postedValues, HttpContext context)
     {
-        var (value, errors) = Evaluate(field, context);
+        var (value, errors) = Evaluate(field, context, postedValues);
 
-        // Invalid input never reaches storage: ValidateField reports the same errors and Forms refuses the submit.
-        return value is null || errors.Count > 0 ? [] : [value.ToJson()];
+        return value is null || errors.Count > 0 ? [] : [Serialise(value, field)];
     }
+
+    /// <summary>
+    /// Forms stores whatever this returns, and two paths hand it a value nobody validated: a site with a FormPrePopulate handler
+    /// (Forms then takes <c>Request.Form[fieldId]</c> as the field's value, and our parts are under other keys) and the headless
+    /// Delivery API. So the value stored is never the incoming one when this request already evaluated the field.
+    /// </summary>
+    public override IEnumerable<object> ConvertToRecord(Field field, IEnumerable<object> postedValues, HttpContext context)
+    {
+        if (context.Items.TryGetValue(OutcomeKey(field), out var cached) && cached is Outcome known)
+        {
+            return known.Value is null || known.Errors.Count > 0 ? [] : [Serialise(known.Value, field)];
+        }
+
+        // Nothing evaluated this request: the value is one Forms kept in form state (a multi-page form's earlier page), a
+        // prefill, or a headless post that skipped validation. It is accepted only if it passes the submit checks again.
+        foreach (var candidate in postedValues)
+        {
+            var (value, errors) = EvaluateSerialised(field, candidate?.ToString());
+            if (value is not null && errors.Count == 0)
+            {
+                return [Serialise(value, field)];
+            }
+        }
+
+        return [];
+    }
+
+    // The tag is what lets a stored lookup survive being read back: a value without a valid one is untrusted, however it
+    // claims to have been made. Only a lookup carries one.
+    private string Serialise(AddressValue value, Field field) =>
+        value.ToJson(value.Source == "lookup" ? _proofs.IssueStoredTag(value, field.Id) : null);
+
+    private static bool IsHidden(Form form, Field field, IFieldTypeStorage fieldTypeStorage, IPlaceholderParsingService placeholders) =>
+        form.AllFields.Any(f => f.Id == field.Id) && !IsFieldVisible(form, field, fieldTypeStorage, placeholders);
+
+    private static (Type, Guid) OutcomeKey(Field field) => (typeof(AddressLookupFieldType), field.Id);
 
     // Forms runs ProcessSubmittedValue and then ValidateField on one request (spike S1). Evaluating once keeps the second call
     // from re-scanning the same input, and guarantees both hooks give the same answer.
-    private (AddressValue? Value, List<string> Errors) Evaluate(Field field, HttpContext context)
+    private (AddressValue? Value, List<string> Errors) Evaluate(Field field, HttpContext context, IEnumerable<object> posted)
     {
-        var (value, errors, _) = EvaluateWithState(field, context);
+        var (value, errors, _) = EvaluateWithState(field, context, posted);
         return (value, errors);
     }
 
-    private (AddressValue? Value, List<string> Errors, bool NothingPosted) EvaluateWithState(Field field, HttpContext context)
+    private (AddressValue? Value, List<string> Errors, bool NothingPosted) EvaluateWithState(
+        Field field, HttpContext context, IEnumerable<object> posted)
     {
-        var key = (typeof(AddressLookupFieldType), field.Id);
+        var key = OutcomeKey(field);
         if (context.Items.TryGetValue(key, out var cached) && cached is Outcome known)
         {
             return (known.Value, [.. known.Errors], known.NothingPosted);
         }
 
-        var (value, errors, nothingPosted) = EvaluateCore(field, context);
+        var (value, errors, nothingPosted) = EvaluateCore(field, context, posted);
         context.Items[key] = new Outcome(value, errors, nothingPosted);
         return (value, [.. errors], nothingPosted);
     }
 
     private sealed record Outcome(AddressValue? Value, IReadOnlyList<string> Errors, bool NothingPosted);
 
-    private (AddressValue? Value, List<string> Errors, bool NothingPosted) EvaluateCore(Field field, HttpContext context)
+    private (AddressValue? Value, List<string> Errors, bool NothingPosted) EvaluateCore(
+        Field field, HttpContext context, IEnumerable<object> posted)
     {
-        var errors = new List<string>();
-
-        // A headless (JSON) submit has no form, and HttpRequest.Form throws on it.
-        var form = context.Request.HasFormContentType ? context.Request.Form : FormCollection.Empty;
-        var (raw, proof) = AddressFormReader.Read(form, field.Id);
         var mandatory = field.Mandatory;
 
-        if (raw is null)
+        // A headless (JSON) submit has no form, and HttpRequest.Form throws on it. The address then arrives as one JSON value
+        // (the stored shape) and is held to the same checks as the parts a browser posts.
+        if (!context.Request.HasFormContentType)
         {
-            if (mandatory)
+            var json = posted.Select(p => p?.ToString()).FirstOrDefault(p => !string.IsNullOrWhiteSpace(p));
+            if (json is null)
             {
-                errors.AddRange(["Enter the first line of the address", "Enter a town or city", "Enter a postcode"]);
+                return (null, mandatory ? MissingParts() : [], true);
             }
 
-            return (null, errors, true);
+            var (value, errors) = EvaluateSerialised(field, json);
+            return (value, errors, false);
         }
 
+        var (raw, proof) = AddressFormReader.Read(context.Request.Form, field.Id);
+        if (raw is null)
+        {
+            return (null, mandatory ? MissingParts() : [], true);
+        }
+
+        return Finish(field, raw, address => _proofs.Verify(proof, address, field.Id));
+    }
+
+    private static List<string> MissingParts() => ["Enter the first line of the address", "Enter a town or city", "Enter a postcode"];
+
+    // A serialised address is the stored shape. Its source is a claim, not evidence: only the keyed tag the submit path put on
+    // it proves a provider returned it, so everything else is stored as manual.
+    private (AddressValue? Value, List<string> Errors) EvaluateSerialised(Field field, string? json)
+    {
+        if (!AddressValue.TryParse(json, out var parsed, out var tag) || parsed is null)
+        {
+            return (null, ["Enter a valid address"]);
+        }
+
+        var (value, errors, _) = Finish(field, parsed, address => _proofs.VerifyStoredTag(tag, address, field.Id));
+        return (value, errors);
+    }
+
+    private (AddressValue? Value, List<string> Errors, bool NothingPosted) Finish(
+        Field field, AddressValue raw, Func<AddressValue, bool> isVerified)
+    {
+        var errors = new List<string>();
         var countries = AddressFieldSettings.ParseCountries(AddressFieldSettings.Get(field.Settings, "Countries"));
         var posted = raw with { CountryIso2 = string.IsNullOrWhiteSpace(raw.CountryIso2) ? countries[0] : raw.CountryIso2 };
 
@@ -168,9 +233,15 @@ public sealed class AddressLookupFieldType : FieldType
             errors.Add("Remove any special characters from the address");
         }
 
+        // The form posts three lines; a JSON value can carry any number, and a fourth would shift or be silently dropped.
+        if (posted.Lines.Count(l => !string.IsNullOrWhiteSpace(l)) > MaxFieldLines)
+        {
+            errors.Add("Use no more than three address lines");
+        }
+
         var address = posted.Normalise();
         // Line 1 itself, not "any line": a visitor who fills line 2 only would otherwise slip through and shift up.
-        if (string.IsNullOrWhiteSpace(posted.Lines[0]))
+        if (string.IsNullOrWhiteSpace(posted.Lines.FirstOrDefault()))
         {
             errors.Add("Enter the first line of the address");
         }
@@ -202,7 +273,7 @@ public sealed class AddressLookupFieldType : FieldType
 
         // The proof covers the address parts and the provider id. The country name is set here from the ISO code, so a
         // posted name can never reach storage.
-        var verified = _proofs.Verify(proof, address, field.Id);
+        var verified = isVerified(address);
         // Only enforceable when a proof can exist: proxy mode with a provider. Capture mode and "no provider" both flag a
         // configuration error instead of making the form unsubmittable.
         var requireLookup = AddressFieldSettings.IsOn(AddressFieldSettings.Get(field.Settings, "RequireLookup"))

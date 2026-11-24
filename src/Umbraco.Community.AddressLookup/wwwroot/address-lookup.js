@@ -3,6 +3,17 @@
 
 const DEBOUNCE_MS = 250;
 const MIN_CHARS = 3;
+// Consecutive soft failures (a 503, or a network error) tolerated before search is given up for the page view.
+const MAX_SOFT_FAILURES = 3;
+
+// Search text the server accepts: letters, marks, digits, spaces and punctuation, minus "<" and ">". Mirrors
+// LookupInput.IsAllowed in Core/Controllers/LookupInput.cs (Unicode categories L*, Mn, Mc, N*, P*, and U+0020 only as the space).
+// Anything else makes the server answer 400, which the field treats as a dead ticket, so it is removed before the request.
+const DISALLOWED_SEARCH_CHARS = /[^\p{L}\p{Mn}\p{Mc}\p{N}\p{P} ]|[<>]/gu;
+
+function cleanSearchText(text) {
+  return text.replace(DISALLOWED_SEARCH_CHARS, '').replace(/ {2,}/g, ' ').trim();
+}
 
 const TEXT = {
   found: (n) => (n === 1 ? '1 address found' : `${n} addresses found`),
@@ -13,6 +24,11 @@ const TEXT = {
   unavailable: 'Address search is not available right now. Enter the address manually.',
   expired: 'This page has been open for a long time, so address search has stopped. Enter the address manually.',
   throttled: 'There have been too many searches. Enter the address manually.',
+  // Under RequireLookup the server refuses a manual entry, so offering the inputs would be a dead end.
+  reload: 'Address search has stopped working. Reload the page and try again later.',
+  retry: 'Address search is not working right now. Keep typing, or try again in a moment.',
+  retryThrottled: 'There have been too many searches. Wait a moment, then try again.',
+  badChars: 'Search with letters, numbers and punctuation only.',
 };
 
 function post(root, action, fields, signal) {
@@ -45,6 +61,8 @@ class ProxyLookup {
     this.message = root.querySelector('[data-al-message]');
     this.manual = root.querySelector('[data-al-manual]');
     this.manualButton = root.querySelector('[data-al-manual-button]');
+    this.requireLookup = root.dataset.requireLookup === 'true';
+    this.softFailures = 0;
     this.items = [];
     this.active = -1;
     this.container = null;
@@ -77,6 +95,7 @@ class ProxyLookup {
     clearTimeout(this.timer);
     this.controller?.abort();
 
+    this.clearRetry();
     if (this.input.value.trim().length < MIN_CHARS) {
       this.close();
       this.say('');
@@ -125,10 +144,16 @@ class ProxyLookup {
   }
 
   async search() {
-    if (this.input.value.trim().length < MIN_CHARS) return;
+    const text = cleanSearchText(this.input.value);
+    if (text.length < MIN_CHARS) {
+      // Nothing searchable is left, so no request is made. The field stays usable: typing on starts a new search.
+      this.close();
+      if (this.input.value.trim().length >= MIN_CHARS) this.say(TEXT.badChars);
+      return;
+    }
     this.controller?.abort();
     const controller = (this.controller = new AbortController());
-    const fields = { text: this.input.value.trim() };
+    const fields = { text };
     if (this.container) fields.container = this.container;
 
     let response;
@@ -136,13 +161,13 @@ class ProxyLookup {
       response = await post(this.root, 'Find', fields, controller.signal);
     } catch (error) {
       if (error?.name === 'AbortError') return;
-      this.fallBack(TEXT.unavailable);
+      this.fail(undefined);
       return;
     }
     if (controller.signal.aborted) return;
 
     if (!response.ok) {
-      this.fallBack(this.reasonFor(response.status));
+      this.fail(response.status);
       return;
     }
 
@@ -155,6 +180,8 @@ class ProxyLookup {
     }
     if (controller.signal.aborted || !Array.isArray(items)) return;
 
+    this.softFailures = 0;
+    this.clearRetry();
     this.items = items;
     this.render();
     if (!items.length) {
@@ -250,12 +277,12 @@ class ProxyLookup {
     try {
       response = await post(this.root, 'Retrieve', { id: item.id }, controller.signal);
     } catch (error) {
-      if (error?.name !== 'AbortError') this.fallBack(TEXT.unavailable);
+      if (error?.name !== 'AbortError') this.fail(undefined);
       return;
     }
     if (controller.signal.aborted) return;
     if (!response.ok) {
-      this.fallBack(this.reasonFor(response.status));
+      this.fail(response.status);
       return;
     }
 
@@ -301,7 +328,30 @@ class ProxyLookup {
     if (focus) this.parts.line1?.focus();
   }
 
+  // A 503 (or a network error) is usually a blip, so search stays open and the visitor can try again. A 429 is the throttle
+  // doing its job, so it still ends the search (design 6) unless the field is RequireLookup, where manual entry is no way out.
+  fail(status) {
+    const soft = status === undefined || status === 503 || (status === 429 && this.requireLookup);
+    if (soft && ++this.softFailures < MAX_SOFT_FAILURES) {
+      const text = status === 429 ? TEXT.retryThrottled : TEXT.retry;
+      this.message.hidden = false;
+      this.message.textContent = text;
+      this.say(text);
+      // A failed Retrieve leaves the chosen suggestion to try again.
+      if (this.items.length && document.activeElement === this.input) this.open();
+      return;
+    }
+    this.fallBack(this.reasonFor(status));
+  }
+
+  clearRetry() {
+    if (this.root.classList.contains('al--failed')) return;
+    this.message.hidden = true;
+    this.message.textContent = '';
+  }
+
   reasonFor(status) {
+    if (this.requireLookup) return TEXT.reload;
     if (status === 429) return TEXT.throttled;
     // A 400 is an expired ticket or antiforgery token (a form page left open for about two hours); a younger page got it for
     // another reason, so the message must not blame the page.
@@ -309,7 +359,7 @@ class ProxyLookup {
     return status === 400 && ageMs > 100 * 60 * 1000 ? TEXT.expired : TEXT.unavailable;
   }
 
-  // Any failure ends the search for this page and leaves the manual inputs, so a visitor can always finish the form.
+  // Ends the search for this page and leaves the manual inputs, so a visitor can always finish the form (not under RequireLookup).
   fallBack(reason) {
     clearTimeout(this.timer);
     this.controller?.abort();
@@ -318,10 +368,19 @@ class ProxyLookup {
     this.root.classList.add('al--failed');
     this.message.hidden = false;
     this.message.textContent = reason;
-    this.showManual(false);
-    // The search box is gone, so focus goes to the first manual input (WCAG 2.4.3), and the polite status carries the reason
-    // because text set in a region that was just revealed is not reliably announced (4.1.3).
+    // The search box is gone, so focus moves on (WCAG 2.4.3), and the polite status carries the reason because text set in
+    // a region that was just revealed is not reliably announced (4.1.3).
     this.say(reason);
+    if (this.requireLookup) {
+      // The server refuses any entry that was not picked from the list, so manual inputs would be a dead end.
+      this.manual.hidden = true;
+      if (hadFocus) {
+        this.message.tabIndex = -1;
+        this.message.focus();
+      }
+      return;
+    }
+    this.showManual(false);
     if (hadFocus) this.parts.line1?.focus();
   }
 
@@ -337,14 +396,14 @@ let captureLoad;
 // One script and one stylesheet per page, however many address fields it holds: a second copy would redefine window.pca.
 function loadCapture(version) {
   captureLoad ??= new Promise((resolve) => {
-    const base = `https://api.addressy.com/js/address-${version}`;
+    // The script and the stylesheet live under different paths: /js/ for the script, /css/ for the stylesheet.
     const css = document.createElement('link');
     css.rel = 'stylesheet';
-    css.href = `${base}.css`;
+    css.href = `https://api.addressy.com/css/address-${version}.css`;
     document.head.append(css);
 
     const script = document.createElement('script');
-    script.src = `${base}.js`;
+    script.src = `https://api.addressy.com/js/address-${version}.js`;
     script.async = true;
     script.addEventListener('load', () => resolve(window.pca));
     script.addEventListener('error', () => resolve(undefined));

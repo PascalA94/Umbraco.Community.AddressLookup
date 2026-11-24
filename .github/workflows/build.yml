@@ -38,6 +38,8 @@ jobs:
       FormsDemoVersion: ${{ matrix.leg == 'latest' && format('{0}.*', matrix.line) || '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Setup .NET
         uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
@@ -79,6 +81,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
       # Scans every commit in the PR range: put `// gitleaks:allow` on fake test secrets in the commit that adds them.
       - name: gitleaks
         run: bash build/gitleaks.sh "${{ github.event.pull_request.base.sha || github.event.before }}..${{ github.sha }}"
@@ -94,6 +97,14 @@ jobs:
       upload-sarif: false
       scan-args: |-
         --config=./osv-scanner.toml
+        --lockfile=packages.lock.json:./src/Umbraco.Community.AddressLookup/packages.17.lock.json
+        --lockfile=packages.lock.json:./src/Umbraco.Community.AddressLookup/packages.18.lock.json
+        --lockfile=packages.lock.json:./src/Umbraco.Community.AddressLookup.Tests/packages.17.lock.json
+        --lockfile=packages.lock.json:./src/Umbraco.Community.AddressLookup.Tests/packages.18.lock.json
+        --lockfile=packages.lock.json:./src/Umbraco.Community.AddressLookup.IntegrationTests/packages.17.lock.json
+        --lockfile=packages.lock.json:./src/Umbraco.Community.AddressLookup.IntegrationTests/packages.18.lock.json
+        --lockfile=packages.lock.json:./demo/Umbraco.Community.AddressLookup.DemoSite/packages.17.lock.json
+        --lockfile=packages.lock.json:./demo/Umbraco.Community.AddressLookup.DemoSite/packages.18.lock.json
         --recursive
         ./
 
@@ -109,6 +120,8 @@ jobs:
         line: ['17', '18']
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Setup .NET
         uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:

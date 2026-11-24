@@ -127,10 +127,24 @@ test('manual entry button works', async ({ page }) => {
   await expect(page.getByText(THANKS)).toBeVisible();
 });
 
+/** Types a search and waits for the server's answer, so a later search cannot abort the earlier request and skip its failure count. */
+async function findAnswered(page: Page, root: Locator, text: string) {
+  await Promise.all([
+    page.waitForResponse((r) => r.url().includes('/AddressLookup/Find') && r.request().method() === 'POST'),
+    combobox(root).fill(text),
+  ]);
+}
+
 test('unavailable falls back to manual', async ({ page }) => {
   const root = await open(page);
 
-  await combobox(root).fill('ZZ99 9ZZ');
+  // One 503 is a blip and keeps search open; the third in a row ends it. The stub treats these spellings alike, and each is a different search so the client sends all three.
+  await findAnswered(page, root, 'ZZ99 9ZZ');
+  await expect(message(root)).toContainText('not working right now');
+  await expect(combobox(root)).toBeVisible();
+  await findAnswered(page, root, 'ZZ9 99ZZ');
+  await expect(status(root)).toContainText('not working right now');
+  await findAnswered(page, root, 'ZZ999ZZ');
 
   await expect(message(root)).toContainText('not available');
   await expect(part(root, 'line1')).toBeVisible();
@@ -170,6 +184,66 @@ test('a refused search on a young page does not blame the page', async ({ page }
 
   await expect(message(root)).toContainText('not available');
   await expect(message(root)).not.toContainText('open for a long time');
+});
+
+test('a symbol in the search text does not end the search', async ({ page }) => {
+  const sent: string[] = [];
+  await page.route('**/umbraco/surface/AddressLookup/Find', async (route) => {
+    sent.push(new URLSearchParams(route.request().postData() ?? '').get('text') ?? '');
+    await route.continue();
+  });
+  const root = await open(page);
+
+  await combobox(root).fill('Flat 1+2');
+  await expect.poll(() => sent.length).toBeGreaterThan(0);
+  // The symbol is removed on the client, so the server never answers 400 and the search stays usable.
+  expect(sent[0]).toBe('Flat 12');
+  await expect(combobox(root)).toBeVisible();
+  await expect(root).not.toHaveClass(/al--failed/);
+
+  await search(root, 'ST1');
+  await expect(options(root)).toHaveCount(3);
+});
+
+test('search stays open after a single 503 and recovers', async ({ page }) => {
+  let calls = 0;
+  await page.route('**/umbraco/surface/AddressLookup/Find', async (route) => {
+    calls += 1;
+    if (calls === 1) {
+      await route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"unavailable"}' });
+      return;
+    }
+    await route.continue();
+  });
+  const root = await open(page);
+
+  await combobox(root).fill('ST1');
+  await expect(message(root)).toContainText('not working right now');
+  await expect(combobox(root)).toBeVisible();
+
+  await search(root, 'ST1 1');
+  await expect(options(root)).not.toHaveCount(0);
+  await expect(message(root)).toBeHidden();
+});
+
+test('lookup required hides the manual button', async ({ page }) => {
+  const root = await open(page, 'required');
+  await expect(combobox(root)).toBeVisible();
+  await expect(root.getByRole('button', { name: 'Enter address manually' })).toHaveCount(0);
+  // The combobox is never mandatory in itself: the required inputs are line 1, town and postcode.
+  await expect(combobox(root)).not.toHaveAttribute('aria-required', 'true');
+});
+
+test('lookup required failure asks for a reload, not manual entry', async ({ page }) => {
+  await page.route('**/umbraco/surface/AddressLookup/Find', (route) =>
+    route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"unavailable"}' }));
+  const root = await open(page, 'required');
+
+  for (const text of ['ST1', 'ST1 1', 'ST1 1A']) await findAnswered(page, root, text);
+
+  await expect(message(root)).toContainText('Reload the page');
+  await expect(part(root, 'line1')).toBeHidden();
+  await expect(combobox(root)).toBeHidden();
 });
 
 test('axe has no violations, closed and open', async ({ page }) => {

@@ -29,17 +29,19 @@ Pick the package line that matches your CMS major. Both lines come from the same
 
 Umbraco 18:
 
+This is a prerelease, so the commands need `--prerelease` (or a pinned version) until 17.0.0 and 18.0.0 are out.
+
 ```bash
-dotnet add package Umbraco.Community.AddressLookup
+dotnet add package Umbraco.Community.AddressLookup --prerelease
 ```
 
 Umbraco 17 (the unpinned command above installs the latest 18.x, so pin the 17 line):
 
 ```bash
-dotnet add package Umbraco.Community.AddressLookup --version 17.0.0
+dotnet add package Umbraco.Community.AddressLookup --version 17.0.0-alpha.1
 ```
 
-Use the latest 17.x version number from NuGet in place of `17.0.0`.
+Use the latest 17.x version number from NuGet in place of `17.0.0-alpha.1`.
 
 Then configure a provider (below) and add an "Address lookup" field to a form in the Forms designer. With no provider set, the field still works as plain manual entry.
 
@@ -141,10 +143,12 @@ One compact JSON value per entry:
 
 ```json
 {"v":1,"lines":["Flat 2","10 High Street"],"town":"Leeds","county":null,"postcode":"LS1 4AP",
- "countryIso2":"GB","country":"United Kingdom","provider":"loqate","providerId":"GB|RM|A|123","source":"lookup"}
+ "countryIso2":"GB","country":"United Kingdom","provider":"loqate","providerId":"GB|RM|A|123","source":"lookup","t":"CfDJ8..."}
 ```
 
 - `source` is `lookup` only when the proof verifies. Otherwise it is `manual` and `provider` and `providerId` are null.
+- `t` is a tag the server adds to a verified lookup value, so a stored value can be shown again (multi-page forms, a failed submit) without being re-checked by the provider. It is protected with ASP.NET Data Protection, so hosts behind a load balancer need a shared key ring, as for the proof. A lookup value without a valid tag is treated as `manual`. Ignore the field in your own reading code.
+- Headless clients (the Forms Delivery API) go through the same checks. With `RequireLookup` on, a headless post is accepted only when it carries a value the server tagged.
 - Forms shows this raw JSON in the entries view, in the CSV export and in the default email. Forms has no hook for a readable form, so use a workflow that formats the value, or read the JSON in your own code. `AddressValue.Format()` gives a one-line form.
 - Submit-time checks: line 1, town and postcode are required once anything is typed. Parts are length-capped, control characters, `<` and `>` and spreadsheet-formula starts are refused, a GB postcode is checked against the standard pattern, and the country must be in the field's Countries.
 - Commercial addresses can return four lines. The field holds three, so extra lines are folded into line 3.
@@ -171,7 +175,7 @@ One compact JSON value per entry:
 
 ## Forms behaviour to know about
 
-- **Conditions.** A mandatory address hidden by its own field condition does not block the submit. A mandatory address inside a fieldset or page that a condition hides probably still does: only the field's own condition is handled and tested. Avoid mandatory on a field in a conditional fieldset or page, or test it on your form.
+- **Conditions.** A field hidden by its own condition, or by its fieldset's, does not block the submit and stores nothing, whether it is mandatory or not. Forms has no page-level condition, so pages need nothing.
 - **Multi-page forms.** Going Back refills the address from Forms' stored value, and a stored lookup keeps its verification. Only a two-page demo form has been tried, so test other layouts on your own form.
 - **Manual-only mode** (no provider). Forms' caption label points at nothing, so clicking it focuses no input. The Forms designer preview and the settings views were checked on Umbraco 17 only.
 

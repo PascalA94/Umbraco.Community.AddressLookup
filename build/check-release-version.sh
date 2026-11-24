@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # Release gate. One tag packs both Umbraco lines: release/<PackageMinor>.<PackagePatch>[-suffix] (suffix optional),
 # for example release/0.0-alpha.1 gives 17.0.0-alpha.1 and 18.0.0-alpha.1, and release/1.2 gives 17.1.2 and 18.1.2.
-# Fails if Directory.Build.props disagrees with the tag, and (when the package has a client) if a client version file is
-# not the 0.0.0 placeholder: the pack step stamps the real version. Run from the repository root.
+# Fails if Directory.Build.props disagrees with the tag. Run from the repository root.
 # Usage: build/check-release-version.sh release/0.0-alpha.1
 set -euo pipefail
 

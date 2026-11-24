@@ -92,6 +92,21 @@ public class LoqateProviderTests
     }
 
     [Fact]
+    public async Task Retrieve_KeepsLine4AndLine5_WhichFitToFieldFoldsIntoLine3()
+    {
+        // Loqate v1.30 returns up to five lines plus the company; mapping only three dropped the rest of a long address.
+        const string json =
+            "{\"Items\":[{\"Company\":\"Acme Ltd\",\"Line1\":\"Unit 1\",\"Line2\":\"Mill Yard\",\"Line3\":\"Mill Lane\"," +
+            "\"Line4\":\"Holbeck\",\"Line5\":\"Hunslet\",\"City\":\"Leeds\",\"PostalCode\":\"LS1 4AP\",\"CountryIso2\":\"GB\"}]}";
+
+        var address = await Create(RecordingHandler.Json(json)).RetrieveAsync("GB|RM|A|1", CancellationToken.None);
+
+        Assert.NotNull(address);
+        Assert.Equal(["Acme Ltd", "Unit 1", "Mill Yard", "Mill Lane", "Holbeck", "Hunslet"], address.Lines);
+        Assert.Equal(["Acme Ltd", "Unit 1", "Mill Yard, Mill Lane, Holbeck, Hunslet"], address.FitToField().Lines);
+    }
+
+    [Fact]
     public async Task Retrieve_NoItems_Null()
     {
         Assert.Null(await Create(RecordingHandler.Json("{\"Items\":[]}")).RetrieveAsync("x", CancellationToken.None));

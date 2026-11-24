@@ -28,7 +28,11 @@ public sealed record PostedAddress(
     public static PostedAddress Empty { get; } = new(
         string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty);
 
-    public bool IsEmpty => this == Empty;
+    // The view always posts the country and the two hidden provider inputs, so they say nothing about whether the visitor typed
+    // or picked anything. Same rule as AddressFormReader.
+    public bool IsEmpty =>
+        string.IsNullOrWhiteSpace(Line1) && string.IsNullOrWhiteSpace(Line2) && string.IsNullOrWhiteSpace(Line3)
+        && string.IsNullOrWhiteSpace(Town) && string.IsNullOrWhiteSpace(County) && string.IsNullOrWhiteSpace(Postcode);
 
     // An address is personal data and a record prints every member (design 5.1).
     public override string ToString() => nameof(PostedAddress);
@@ -121,8 +125,9 @@ public sealed partial class AddressFieldRenderer(
     private static string ScriptVersion(string? configured) =>
         configured is not null && VersionPattern().IsMatch(configured) ? configured : DefaultCaptureVersion;
 
-    // The stored value is Forms' own saved state for this field, so a lookup it recorded keeps its verification: a fresh proof
-    // is issued over the same address, exactly as Retrieve would.
+    // A fresh proof is issued only for a value carrying the server's own stored tag, which the submit path adds to a verified
+    // lookup. Anything else that claims "lookup" (raw form state, member prefill, a FormPrePopulate handler) is content the
+    // server cannot attribute to its own Retrieve, and signing it would make this view a proof oracle.
     private PostedAddress? FromStored(string? stored, Guid fieldId)
     {
         if (string.IsNullOrWhiteSpace(stored) || stored.Length > MaxStored || !AddressValue.TryParse(stored, out var value) || value is null)
@@ -130,7 +135,8 @@ public sealed partial class AddressFieldRenderer(
             return null;
         }
 
-        var verified = value.Source == "lookup" && !string.IsNullOrEmpty(value.ProviderId);
+        AddressValue.TryParse(stored, out _, out var tag);
+        var verified = proofs.VerifyStoredTag(tag, value, fieldId);
         string Part(string? text) => text is { Length: > MaxEchoed } ? text[..MaxEchoed] : text ?? string.Empty;
         string Line(int i) => i < value.Lines.Count ? Part(value.Lines[i]) : string.Empty;
 
