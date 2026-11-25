@@ -1,7 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
-  <!-- Placeholder package icon: replace with the package's own design (keep 128x128, and re-render icon.png). -->
   <rect width="128" height="128" rx="24" fill="#1b264f"/>
-  <path d="M64 26 98 44v40L64 102 30 84V44z" fill="#ffffff"/>
-  <path d="M64 26 98 44 64 62 30 44z" fill="#f5c1bc"/>
-  <path d="M64 62v40" stroke="#1b264f" stroke-width="4"/>
+  <path d="M64 18a26 26 0 0 1 26 26c0 17-26 40-26 40S38 61 38 44a26 26 0 0 1 26-26z" fill="#f5c1bc"/>
+  <circle cx="64" cy="44" r="10" fill="#1b264f"/>
+  <path d="M30 98h68M30 110h44" stroke="#ffffff" stroke-width="6" stroke-linecap="round" fill="none"/>
 </svg>
