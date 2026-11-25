@@ -15,7 +15,20 @@
     "Url": "https://github.com/PascalA94",
     "ImageUrl": "https://github.com/PascalA94.png"
   },
-  "Screenshots": [],
+  "Screenshots": [
+    {
+      "ImageUrl": "https://raw.githubusercontent.com/PascalA94/Umbraco.Community.AddressLookup/main/assets/screenshots/screenshot-01-suggestions.png",
+      "Caption": "Suggestions appear as visitors type a postcode or address."
+    },
+    {
+      "ImageUrl": "https://raw.githubusercontent.com/PascalA94/Umbraco.Community.AddressLookup/main/assets/screenshots/screenshot-02-address-filled.png",
+      "Caption": "Picking a suggestion fills the address fields, which stay editable."
+    },
+    {
+      "ImageUrl": "https://raw.githubusercontent.com/PascalA94/Umbraco.Community.AddressLookup/main/assets/screenshots/screenshot-03-manual-fallback.png",
+      "Caption": "If the provider is unavailable, visitors enter the address manually."
+    }
+  ],
   "Tags": [
     "umbraco",
     "umbraco-marketplace",

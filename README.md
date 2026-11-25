@@ -9,8 +9,7 @@ An Umbraco Forms address lookup field with Loqate and Ideal Postcodes behind a s
 
 A community package, not made or supported by Umbraco HQ.
 
-<!-- TODO before the first release: add the best screenshot from assets/screenshots/ with an absolute URL, so it also shows on NuGet:
-![What it looks like](https://raw.githubusercontent.com/PascalA94/Umbraco.Community.AddressLookup/main/assets/screenshots/screenshot-01-<what>.png) -->
+![Suggestions appear as you type, then fill the address fields](https://raw.githubusercontent.com/PascalA94/Umbraco.Community.AddressLookup/main/assets/screenshots/screenshot-01-suggestions.png)
 
 A visitor types a postcode or part of an address, picks a result and gets a structured address. They can always type it in by hand, with or without JavaScript. The field stores one JSON value per entry, so a half-filled address cannot go missing.
 
