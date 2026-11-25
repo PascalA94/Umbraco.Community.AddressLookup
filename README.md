@@ -28,19 +28,17 @@ Pick the package line that matches your CMS major. Both lines come from the same
 
 Umbraco 18:
 
-This is a prerelease, so the commands need `--prerelease` (or a pinned version) until 17.0.0 and 18.0.0 are out.
-
 ```bash
-dotnet add package Umbraco.Community.AddressLookup --prerelease
+dotnet add package Umbraco.Community.AddressLookup
 ```
 
 Umbraco 17 (the unpinned command above installs the latest 18.x, so pin the 17 line):
 
 ```bash
-dotnet add package Umbraco.Community.AddressLookup --version 17.0.0-alpha.1
+dotnet add package Umbraco.Community.AddressLookup --version 17.0.0
 ```
 
-Use the latest 17.x version number from NuGet in place of `17.0.0-alpha.1`.
+Use the latest 17.x version number from NuGet in place of `17.0.0`.
 
 Then configure a provider (below) and add an "Address lookup" field to a form in the Forms designer. With no provider set, the field still works as plain manual entry.
 
