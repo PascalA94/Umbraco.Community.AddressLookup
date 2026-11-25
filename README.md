@@ -9,11 +9,19 @@ An Umbraco Forms address lookup field with Loqate and Ideal Postcodes behind a s
 
 A community package, not made or supported by Umbraco HQ.
 
-![Suggestions appear as you type, then fill the address fields](https://raw.githubusercontent.com/PascalA94/Umbraco.Community.AddressLookup/main/assets/screenshots/screenshot-01-suggestions.png)
+![Suggestions appear over the form as visitors type a postcode or address](https://raw.githubusercontent.com/PascalA94/Umbraco.Community.AddressLookup/main/assets/screenshots/screenshot-01-suggestions.png)
 
 A visitor types a postcode or part of an address, picks a result and gets a structured address. They can always type it in by hand, with or without JavaScript. The field stores one JSON value per entry, so a half-filled address cannot go missing.
 
 By default the browser only talks to your site. Your site talks to the provider with a key that never leaves the server. An optional Capture mode loads Loqate's own browser widget instead, with a separate browser key.
+
+## Screenshots
+
+![Picking a suggestion fills the address fields, which stay editable](https://raw.githubusercontent.com/PascalA94/Umbraco.Community.AddressLookup/main/assets/screenshots/screenshot-02-address-filled.png)
+
+![If the provider is unavailable, visitors enter the address manually](https://raw.githubusercontent.com/PascalA94/Umbraco.Community.AddressLookup/main/assets/screenshots/screenshot-03-manual-fallback.png)
+
+![Field settings in the Forms designer: countries, placeholder, manual entry, require lookup and show country](https://raw.githubusercontent.com/PascalA94/Umbraco.Community.AddressLookup/main/assets/screenshots/screenshot-04-field-settings.png)
 
 ## Compatibility
 

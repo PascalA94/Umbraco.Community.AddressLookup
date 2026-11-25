@@ -18,7 +18,7 @@
   "Screenshots": [
     {
       "ImageUrl": "https://raw.githubusercontent.com/PascalA94/Umbraco.Community.AddressLookup/main/assets/screenshots/screenshot-01-suggestions.png",
-      "Caption": "Suggestions appear as visitors type a postcode or address."
+      "Caption": "Suggestions appear over the form as visitors type a postcode or address."
     },
     {
       "ImageUrl": "https://raw.githubusercontent.com/PascalA94/Umbraco.Community.AddressLookup/main/assets/screenshots/screenshot-02-address-filled.png",
@@ -27,6 +27,10 @@
     {
       "ImageUrl": "https://raw.githubusercontent.com/PascalA94/Umbraco.Community.AddressLookup/main/assets/screenshots/screenshot-03-manual-fallback.png",
       "Caption": "If the provider is unavailable, visitors enter the address manually."
+    },
+    {
+      "ImageUrl": "https://raw.githubusercontent.com/PascalA94/Umbraco.Community.AddressLookup/main/assets/screenshots/screenshot-04-field-settings.png",
+      "Caption": "Field settings in the Forms designer: countries, placeholder, manual entry, require lookup and show country."
     }
   ],
   "Tags": [
